@@ -4,7 +4,7 @@ import axios from 'axios';
 
 const AGORA_APP_ID = "730f44314cf3422a9f79db66b7d391cf";
 const AGORA_CHANNEL = "test";
-const TOKEN_SERVER_URL = "http://localhost:3000/api/auth/token"
+const TOKEN_SERVER_URL = "http://localhost:5000/api/auth/token"
 
 const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
@@ -20,7 +20,7 @@ const VideoCall = () => {
 
     const fetchToken = async () => {
         // const res = await fetch(`${TOKEN_SERVER_URL}?channel=${AGORA_CHANNEL}&uid=${uid}`);
-        const { data } = await axios.post("http://localhost:3000/api/auth/token", {
+        const { data } = await axios.post("http://56.228.21.25/api/auth/token", {
             channelName: AGORA_CHANNEL,
         })
         return data.token;
