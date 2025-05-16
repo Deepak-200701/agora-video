@@ -18,13 +18,21 @@ const VideoCall = () => {
 
     const uid = Math.floor(Math.random() * 100000);
 
+    // const fetchToken = async () => {
+    //     // const res = await fetch(`${TOKEN_SERVER_URL}?channel=${AGORA_CHANNEL}&uid=${uid}`);
+    //     const { data } = await axios.post("http://localhost:3000/api/auth/token", {
+    //         channelName: AGORA_CHANNEL,
+    //     })
+    //     return data.token;
+    // };
+
     const fetchToken = async () => {
-        // const res = await fetch(`${TOKEN_SERVER_URL}?channel=${AGORA_CHANNEL}&uid=${uid}`);
-        const { data } = await axios.post("http://56.228.21.25/api/auth/token", {
+        const { data } = await axios.post("/api/auth/token", {
             channelName: AGORA_CHANNEL,
-        })
+        });
         return data.token;
     };
+
 
     const joinCall = async () => {
         const token = await fetchToken();
