@@ -1,12 +1,59 @@
-# React + Vite
-
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-Currently, two official plugins are available:
-
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+video-call-app/
+├── public/
+│   ├── index.html
+│   └── assets/
+├── src/
+│   ├── api/
+│   │   ├── agoraService.js
+│   │   └── authService.js
+│   ├── components/
+│   │   ├── common/
+│   │   │   ├── Button.jsx
+│   │   │   ├── Input.jsx
+│   │   │   └── Loader.jsx
+│   │   ├── layout/
+│   │   │   ├── AppLayout.jsx
+│   │   │   └── PageContainer.jsx
+│   │   └── videoCall/
+│   │       ├── ControlPanel.jsx
+│   │       ├── JoinForm.jsx
+│   │       ├── LocalVideoView.jsx
+│   │       ├── RemoteVideoView.jsx
+│   │       └── VideoGrid.jsx
+│   ├── config/
+│   │   ├── agoraConfig.js
+│   │   └── apiConfig.js
+│   ├── constants/
+│   │   └── actionTypes.js
+│   ├── hooks/
+│   │   ├── useAgora.js
+│   │   └── useScreenSharing.js
+│   ├── pages/
+│   │   ├── HomePage.jsx
+│   │   ├── JoinCallPage.jsx
+│   │   └── VideoCallPage.jsx
+│   ├── redux/
+│   │   ├── actions/
+│   │   │   ├── callActions.js
+│   │   │   └── userActions.js
+│   │   ├── reducers/
+│   │   │   ├── callReducer.js
+│   │   │   ├── userReducer.js
+│   │   │   └── rootReducer.js
+│   │   ├── selectors/
+│   │   │   ├── callSelectors.js
+│   │   │   └── userSelectors.js
+│   │   ├── store.js
+│   │   └── thunks/
+│   │       └── callThunks.js
+│   ├── utils/
+│   │   ├── errorHandling.js
+│   │   └── mediaUtils.js
+│   ├── App.jsx
+│   ├── index.js
+│   └── Routes.jsx
+├── .env
+├── .env.example
+├── .gitignore
+├── package.json
+└── README.md
