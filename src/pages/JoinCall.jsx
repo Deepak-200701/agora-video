@@ -1443,7 +1443,7 @@ const JoinCall = () => {
 
     const fetchToken = async () => {
         const { data } = await axios.post("/api/auth/token", {
-            channelName: AGORA_CHANNEL,
+            channelName: channel,
         });
         return data.token;
     };
