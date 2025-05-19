@@ -167,11 +167,23 @@ const JoinCall = () => {
         };
     }, []);
 
+    // const fetchToken = async () => {
+    //     const { data } = await axios.post("http://localhost:5000/api/auth/token", {
+    //         channelName: channel,
+    //     });
+    //     return data.token;
+    // };
+
     const fetchToken = async () => {
-        const { data } = await axios.post("http://localhost:5000/api/auth/token", {
-            channelName: channel,
-        });
-        return data.token;
+        try {
+            const { data } = await axios.post("/api/auth/token", {
+                channelName: channel,
+            });
+            return data.token;
+        } catch (error) {
+            console.error("Error fetching token:", error);
+            throw new Error("Failed to get access token. Please try again.");
+        }
     };
 
     const joinCall = async (e) => {
