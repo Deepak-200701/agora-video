@@ -81,7 +81,7 @@ const JoinCall = () => {
                     } else {
                         console.warn(`Container for remote-video-${user.uid} not found`);
                     }
-                }, 5000);
+                }, 1000);
             }
 
             if (mediaType === 'audio' && user.audioTrack) {
