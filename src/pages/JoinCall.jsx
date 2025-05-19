@@ -488,7 +488,7 @@ const JoinCall = () => {
             {joined ? (
                 <div className="flex flex-col h-screen bg-gray-900">
                     {/* Video Area */}
-                    <div className="flex-1 p-2 overflow-y-scroll">
+                    <div className="flex-1 p-2 overflow-hidden">
                         {renderVideoLayout()}
                     </div>
 
