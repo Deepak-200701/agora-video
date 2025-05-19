@@ -10,6 +10,7 @@ import {
     FaDesktop,
     FaUser
 } from 'react-icons/fa';
+import { Bounce, toast } from 'react-toastify';
 
 const AGORA_APP_ID = "730f44314cf3422a9f79db66b7d391cf";
 
@@ -30,6 +31,9 @@ const JoinCall = () => {
     const [activeSpeakerId, setActiveSpeakerId] = useState(null);
     const [localUserId, setLocalUserId] = useState(null);
 
+    console.log(activeSpeakerId, "active-spk");
+
+
     // Debounce function to prevent flickering during active speaker changes
     const debounce = (func, delay) => {
         let timerId;
@@ -44,11 +48,12 @@ const JoinCall = () => {
         const client = AgoraRTC.createClient({ mode: 'rtc', codec: 'vp8' });
 
         // Configure volume indicator with lower frequency and higher smoothing
-        client.enableAudioVolumeIndicator(500, 3, true);
         clientRef.current = client;
 
         // Handle user publishing streams
         client.on('user-published', async (user, mediaType) => {
+            client.enableAudioVolumeIndicator();
+
             console.log(`User ${user.uid} published ${mediaType} track`);
             await client.subscribe(user, mediaType);
 
@@ -121,17 +126,16 @@ const JoinCall = () => {
         // Handle active speaker detection with threshold
         client.on('volume-indicator', (volumes) => {
             if (volumes.length === 0) return;
-
             // Only consider volumes above threshold to prevent background noise triggers
-            const speakingVolumes = volumes.filter(v => v.volume > 5);
+            const speakingVolumes = volumes.filter(v => v.level > 5);
             if (speakingVolumes.length === 0) return;
 
             const loudestSpeaker = speakingVolumes.reduce((prev, curr) =>
-                prev.volume > curr.volume ? prev : curr
+                prev.level > curr.level ? prev : curr
             );
 
             // Only update active speaker if clearly speaking
-            if (loudestSpeaker.volume > 10) {
+            if (loudestSpeaker.level > 10) {
                 debouncedSetActiveSpeaker(loudestSpeaker.uid);
             }
         });
@@ -142,30 +146,39 @@ const JoinCall = () => {
         };
     }, []);
 
-    const fetchToken = async () => {
-        try {
-            const { data } = await axios.post("/api/auth/token", {
-                channelName: channel,
-            });
-            return data.token;
-        } catch (error) {
-            console.error("Error fetching token:", error);
-            throw new Error("Failed to get access token. Please try again.");
-        }
-    };
-
     // const fetchToken = async () => {
-    //     const { data } = await axios.post("http://localhost:5000/api/auth/token", {
-    //         channelName: channel,
-    //     });
-    //     return data.token;
+    //     try {
+    //         const { data } = await axios.post("/api/auth/token", {
+    //             channelName: channel,
+    //         });
+    //         return data.token;
+    //     } catch (error) {
+    //         console.error("Error fetching token:", error);
+    //         throw new Error("Failed to get access token. Please try again.");
+    //     }
     // };
+
+    const fetchToken = async () => {
+        const { data } = await axios.post("http://localhost:5000/api/auth/token", {
+            channelName: channel,
+        });
+        return data.token;
+    };
 
     const joinCall = async (e) => {
         e.preventDefault();
         if (!channel.trim()) {
-            alert("Please enter a channel name.");
-            return;
+            return toast('Please enter a channel name', {
+                position: "bottom-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light",
+                transition: Bounce,
+            })
         }
 
         try {
@@ -209,7 +222,17 @@ const JoinCall = () => {
             setJoined(true);
         } catch (error) {
             console.error("Error joining call:", error);
-            alert("Failed to join call: " + (error.message || "Unknown error"));
+            return toast(error.message || "Unknown error", {
+                position: "bottom-right",
+                autoClose: 5000,
+                hideProgressBar: false,
+                closeOnClick: false,
+                pauseOnHover: true,
+                draggable: true,
+                progress: undefined,
+                theme: "light",
+                transition: Bounce,
+            })
         }
     };
 
@@ -403,6 +426,8 @@ const JoinCall = () => {
                     <div className="bg-gray-800 py-2 px-4 text-white text-sm flex justify-between items-center">
                         <div>
                             Channel: <span className="font-semibold">{channel}</span>
+                            {/* <br/><br/>
+                            User: <span className="font-semibold">{localUserId}</span> */}
                         </div>
                         <div>
                             {remoteUsers.length + 1} participants
@@ -468,7 +493,7 @@ const JoinCall = () => {
                                         type="text"
                                         value={channel}
                                         onChange={(e) => setChannel(e.target.value)}
-                                        required
+                                        // required
                                         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                         placeholder="Enter channel name"
                                     />
