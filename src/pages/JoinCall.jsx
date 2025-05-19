@@ -50,8 +50,6 @@ const JoinCall = () => {
 
         // Handle user publishing streams
         client.on('user-published', async (user, mediaType) => {
-            client.enableAudioVolumeIndicator();
-
             console.log(`User ${user.uid} published ${mediaType} track`);
             await client.subscribe(user, mediaType);
 
@@ -169,24 +167,24 @@ const JoinCall = () => {
         };
     }, []);
 
-    // const fetchToken = async () => {
-    //     const { data } = await axios.post("http://localhost:5000/api/auth/token", {
-    //         channelName: channel,
-    //     });
-    //     return data.token;
-    // };
-
     const fetchToken = async () => {
-        try {
-            const { data } = await axios.post("/api/auth/token", {
-                channelName: channel,
-            });
-            return data.token;
-        } catch (error) {
-            console.error("Error fetching token:", error);
-            throw new Error("Failed to get access token. Please try again.");
-        }
+        const { data } = await axios.post("http://localhost:5000/api/auth/token", {
+            channelName: channel,
+        });
+        return data.token;
     };
+
+    // const fetchToken = async () => {
+    //     try {
+    //         const { data } = await axios.post("/api/auth/token", {
+    //             channelName: channel,
+    //         });
+    //         return data.token;
+    //     } catch (error) {
+    //         console.error("Error fetching token:", error);
+    //         throw new Error("Failed to get access token. Please try again.");
+    //     }
+    // };
 
     const joinCall = async (e) => {
         e.preventDefault();
@@ -208,6 +206,7 @@ const JoinCall = () => {
             const token = await fetchToken();
             const uid = Math.floor(Math.random() * 100000);
             const client = clientRef.current;
+            client.enableAudioVolumeIndicator();
 
             await client.join(AGORA_APP_ID, channel, token, uid);
             setLocalUserId(uid);
