@@ -30,9 +30,7 @@ const JoinCall = () => {
     const [remoteUsers, setRemoteUsers] = useState([]);
     const [activeSpeakerId, setActiveSpeakerId] = useState(null);
     const [localUserId, setLocalUserId] = useState(null);
-
-    console.log(activeSpeakerId, "active-spk");
-
+    const [userVideoTracks, setUserVideoTracks] = useState({});
 
     // Debounce function to prevent flickering during active speaker changes
     const debounce = (func, delay) => {
@@ -70,6 +68,12 @@ const JoinCall = () => {
 
             if (mediaType === 'video' && user.videoTrack) {
                 console.log(`Playing video for user ${user.uid}`);
+                // Track that this user has video
+                setUserVideoTracks(prev => ({
+                    ...prev,
+                    [user.uid]: true
+                }));
+                
                 // Play video after a small delay to ensure container exists
                 setTimeout(() => {
                     const container = document.getElementById(`remote-video-${user.uid}`);
@@ -94,12 +98,24 @@ const JoinCall = () => {
             }
 
             if (mediaType === 'video') {
-                // Update UI but don't remove user completely
+                // Mark that this user doesn't have video
+                setUserVideoTracks(prev => ({
+                    ...prev,
+                    [user.uid]: false
+                }));
+
+                // Show avatar instead of video
                 const container = document.getElementById(`remote-video-${user.uid}`);
                 if (container) {
-                    container.innerHTML = `<div class="flex items-center justify-center w-full h-full">
-                        <FaUser size={40} className="text-gray-300" />
-                    </div>`;
+                    container.innerHTML = `
+                        <div class="flex items-center justify-center w-full h-full bg-gray-700">
+                            <div class="p-4 rounded-full bg-gray-500 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                    `;
                 }
             }
         });
@@ -111,6 +127,13 @@ const JoinCall = () => {
 
             // Clean up reference
             delete remoteStreamsRef.current[user.uid];
+
+            // Remove from video tracks state
+            setUserVideoTracks(prev => {
+                const newState = {...prev};
+                delete newState[user.uid];
+                return newState;
+            });
 
             // Reset active speaker if they left
             if (activeSpeakerId === user.uid) {
@@ -145,18 +168,6 @@ const JoinCall = () => {
             leaveCall();
         };
     }, []);
-
-    // const fetchToken = async () => {
-    //     try {
-    //         const { data } = await axios.post("/api/auth/token", {
-    //             channelName: channel,
-    //         });
-    //         return data.token;
-    //     } catch (error) {
-    //         console.error("Error fetching token:", error);
-    //         throw new Error("Failed to get access token. Please try again.");
-    //     }
-    // };
 
     const fetchToken = async () => {
         const { data } = await axios.post("http://localhost:5000/api/auth/token", {
@@ -202,6 +213,12 @@ const JoinCall = () => {
 
             micTrackRef.current = micTrack;
             camTrackRef.current = camTrack;
+
+            // Mark local user as having video
+            setUserVideoTracks(prev => ({
+                ...prev,
+                [uid]: true
+            }));
 
             // Ensure local video is displayed immediately, even when solo
             setTimeout(() => {
@@ -262,10 +279,11 @@ const JoinCall = () => {
             setJoined(false);
             setActiveSpeakerId(null);
             setRemoteUsers([]);
-            setChannel("")
-            setIsCamMuted(false)
-            setIsMicMuted(false)
-            setIsScreenSharing(false)
+            setUserVideoTracks({});
+            setChannel("");
+            setIsCamMuted(false);
+            setIsMicMuted(false);
+            setIsScreenSharing(false);
             if (localVideoRef.current) localVideoRef.current.innerHTML = '';
         } catch (err) {
             console.error('Error while leaving call:', err);
@@ -285,6 +303,31 @@ const JoinCall = () => {
             const muted = !isCamMuted;
             await camTrackRef.current.setMuted(muted);
             setIsCamMuted(muted);
+            
+            // Update local video track status
+            if (localUserId) {
+                setUserVideoTracks(prev => ({
+                    ...prev,
+                    [localUserId]: !muted
+                }));
+                
+                // If camera is muted, show avatar instead
+                if (muted && localVideoRef.current) {
+                    localVideoRef.current.innerHTML = `
+                        <div class="flex items-center justify-center w-full h-full bg-gray-700">
+                            <div class="p-4 rounded-full bg-gray-500 flex items-center justify-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                </svg>
+                            </div>
+                        </div>
+                    `;
+                } else if (!muted && camTrackRef.current) {
+                    // Re-show camera if unmuted
+                    localVideoRef.current.innerHTML = '';
+                    camTrackRef.current.play(localVideoRef.current);
+                }
+            }
         }
     };
 
@@ -301,72 +344,69 @@ const JoinCall = () => {
                         frameRate: 15,
                         bitrateMax: 2000
                     }
-                });
+                }, "screen-audio");
 
-                screenTrackRef.current = screenTrack;
-
+                // Store the screen track reference
+                screenTrackRef.current = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
+                
+                // Unpublish camera track before publishing screen
                 if (camTrackRef.current) {
                     await client.unpublish(camTrackRef.current);
                 }
 
-                await client.publish(screenTrack);
+                // Publish screen track
+                await client.publish(screenTrackRef.current);
 
+                // Display screen in local video element
                 if (localVideoRef.current) {
                     localVideoRef.current.innerHTML = '';
-                    screenTrack.play(localVideoRef.current);
+                    screenTrackRef.current.play(localVideoRef.current);
                 }
 
                 setIsScreenSharing(true);
 
-                // Handle screen share end initiated by browser
-                screenTrack.on('track-ended', async () => {
-                    // alert("end")
-                    // toggleScreenShare();
-
-                    if (screenTrackRef.current) {
-                        await client.unpublish(screenTrackRef.current);
-                        screenTrackRef.current.stop();
-                        screenTrackRef.current.close();
-                        screenTrackRef.current = null;
-                    }
-
-                    if (camTrackRef.current) {
-                        await client.publish(camTrackRef.current);
-
-                        if (localVideoRef.current) {
-                            localVideoRef.current.innerHTML = '';
-                            camTrackRef.current.play(localVideoRef.current);
-                        }
-                    }
-
-                    setIsScreenSharing(false);
+                // Handle screen share end initiated by browser or system UI
+                screenTrackRef.current.on('track-ended', async () => {
+                    // Stop screen sharing and return to camera
+                    await stopScreenSharing();
                 });
             } catch (err) {
-                // console.error("Error starting screen share:", err);
-                // alert("Failed to start screen sharing. Please try again.");
+                console.error("Error starting screen share:", err);
+                // toast('Failed to start screen sharing. Please try again.', {
+                //     position: "bottom-right",
+                //     autoClose: 5000,
+                //     theme: "light",
+                //     transition: Bounce,
+                // });
             }
         } else {
-            try {
-                if (screenTrackRef.current) {
-                    await client.unpublish(screenTrackRef.current);
-                    screenTrackRef.current.stop();
-                    screenTrackRef.current.close();
-                    screenTrackRef.current = null;
-                }
+            await stopScreenSharing();
+        }
+    };
 
-                if (camTrackRef.current) {
-                    await client.publish(camTrackRef.current);
-
-                    if (localVideoRef.current) {
-                        localVideoRef.current.innerHTML = '';
-                        camTrackRef.current.play(localVideoRef.current);
-                    }
-                }
-
-                setIsScreenSharing(false);
-            } catch (err) {
-                console.error("Error stopping screen share:", err);
+    // Separated function to stop screen sharing and switch back to camera
+    const stopScreenSharing = async () => {
+        const client = clientRef.current;
+        try {
+            if (screenTrackRef.current) {
+                await client.unpublish(screenTrackRef.current);
+                screenTrackRef.current.stop();
+                screenTrackRef.current.close();
+                screenTrackRef.current = null;
             }
+
+            if (camTrackRef.current) {
+                await client.publish(camTrackRef.current);
+
+                if (localVideoRef.current) {
+                    localVideoRef.current.innerHTML = '';
+                    camTrackRef.current.play(localVideoRef.current);
+                }
+            }
+
+            setIsScreenSharing(false);
+        } catch (err) {
+            console.error("Error stopping screen share:", err);
         }
     };
 
@@ -384,31 +424,42 @@ const JoinCall = () => {
 
         return (
             <div className="flex flex-col w-full h-full">
-                {/* Main Video Area - Active Speaker or Selected User */}
+                {/* Main Video Area - Shows the active speaker or selected user */}
                 <div className="flex-1 flex items-center justify-center p-4">
-                    <div
-                        className="gap-10 w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-white border-2 border-blue-500 shadow-lg relative overflow-hidden"
-                    >
-                        <div
+                    <div className="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-white shadow-lg relative overflow-hidden">
+                        {/* Local user video */}
+                        <div 
                             ref={localVideoRef}
-                            className="w-[250px] h-[150px] rounded-lg bg-black"
-                        ></div>
+                            className={`w-[250px] h-[150px] rounded-lg bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
+                        >
+                            {/* If camera is off, this will be filled with the avatar */}
+                        </div>
 
-                        <div className="flex flex-col justify-start gap-2 w-[250px] h-auto">
-                            {thumbnailUsers.map((user) => (
+                        {/* Remote users video thumbnails */}
+                        <div className="flex flex-col justify-start gap-2 w-[250px] h-auto ml-10">
+                            {remoteUsers.map((user) => (
                                 <div
                                     key={user.uid}
-                                    className={`w-full h-[150px] bg-gray-800 flex items-center justify-center text-white cursor-pointer transition-all duration-200 overflow-hidden`}
+                                    className={`w-full h-[150px] bg-gray-800 flex items-center justify-center text-white cursor-pointer transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
+                                    onClick={() => setActiveSpeakerId(user.uid)}
                                 >
-                                    <div id={`remote-video-${user.uid}`} className="w-full h-full bg-black"></div>
+                                    <div 
+                                        id={`remote-video-${user.uid}`} 
+                                        className="w-full h-full bg-black"
+                                    >
+                                        {!userVideoTracks[user.uid] && (
+                                            <div className="flex items-center justify-center w-full h-full bg-gray-700">
+                                                <div className="p-4 rounded-full bg-gray-500 flex items-center justify-center">
+                                                    <FaUser className="text-white text-2xl" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
-
                     </div>
                 </div>
-
-                {/* Bottom Thumbnails Row */}
             </div>
         );
     };
@@ -426,8 +477,6 @@ const JoinCall = () => {
                     <div className="bg-gray-800 py-2 px-4 text-white text-sm flex justify-between items-center">
                         <div>
                             Channel: <span className="font-semibold">{channel}</span>
-                            {/* <br/><br/>
-                            User: <span className="font-semibold">{localUserId}</span> */}
                         </div>
                         <div>
                             {remoteUsers.length + 1} participants
@@ -493,7 +542,6 @@ const JoinCall = () => {
                                         type="text"
                                         value={channel}
                                         onChange={(e) => setChannel(e.target.value)}
-                                        // required
                                         className="block w-full rounded-md border border-gray-300 px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
                                         placeholder="Enter channel name"
                                     />
@@ -516,5 +564,3 @@ const JoinCall = () => {
 };
 
 export default JoinCall;
-
-
