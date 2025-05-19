@@ -12,7 +12,7 @@ import {
 } from 'react-icons/fa';
 import { Bounce, toast } from 'react-toastify';
 
-const AGORA_APP_ID = "730f44314cf3422a9f79db66b7d391cf";
+const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID;
 
 const JoinCall = () => {
     const clientRef = useRef(null);
@@ -167,23 +167,11 @@ const JoinCall = () => {
         };
     }, []);
 
-    // const fetchToken = async () => {
-    //     const { data } = await axios.post("http://localhost:5000/api/auth/token", {
-    //         channelName: channel,
-    //     });
-    //     return data.token;
-    // };
-
     const fetchToken = async () => {
-        try {
-            const { data } = await axios.post("/api/auth/token", {
-                channelName: channel,
-            });
-            return data.token;
-        } catch (error) {
-            console.error("Error fetching token:", error);
-            throw new Error("Failed to get access token. Please try again.");
-        }
+        const { data } = await axios.post("http://localhost:5000/api/auth/token", {
+            channelName: channel,
+        });
+        return data.token;
     };
 
     const joinCall = async (e) => {
@@ -421,6 +409,15 @@ const JoinCall = () => {
         }
     };
 
+    const getGridCols = (count) => {
+        if (count <= 1) return "grid-cols-1";
+        if (count === 2) return "grid-cols-2";
+        if (count <= 4) return "grid-cols-2";
+        if (count <= 6) return "grid-cols-3";
+        return "grid-cols-4";
+    }
+
+
     // Google Meet style layout with main user and side thumbnails
     const renderVideoLayout = () => {
         // Determine which user should be featured in the main display area
@@ -436,23 +433,22 @@ const JoinCall = () => {
         return (
             <div className="flex flex-col w-full h-full">
                 {/* Main Video Area - Shows the active speaker or selected user */}
-                <div className="flex-1 flex items-center justify-center p-4">
-                    <div className="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-white shadow-lg relative overflow-hidden">
+                <div className="flex-1 flex items-center justify-center">
+                    <div className={`grid ${getGridCols(remoteUsers.length + 1)} w-full h-full bg-gray-900 flex gap-4 items-center justify-center text-white shadow-lg relative overflow-hidden`}>
                         {/* Local user video */}
                         <div
                             ref={localVideoRef}
-                            className={`w-[250px] h-[150px] rounded-lg bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
+                            className={`w-full h-full bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
                         >
                             {/* If camera is off, this will be filled with the avatar */}
                         </div>
 
                         {/* Remote users video thumbnails */}
-                        <div className="flex flex-col justify-start gap-2 w-[250px] h-auto ml-10">
-                            {remoteUsers.map((user) => (
+                        {remoteUsers.map((user) => (
+                            <div key={user.uid} className="flex flex-col justify-start gap-2 w-full h-full">
                                 <div
-                                    key={user.uid}
-                                    className={`w-full h-[150px] bg-gray-800 flex items-center justify-center text-white cursor-pointer transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
-                                    onClick={() => setActiveSpeakerId(user.uid)}
+                                    className={`w-full h-full bg-gray-800 flex items-center justify-center text-white transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
+                                // onClick={() => setActiveSpeakerId(user.uid)}
                                 >
                                     <div
                                         id={`remote-video-${user.uid}`}
@@ -467,8 +463,8 @@ const JoinCall = () => {
                                         )}
                                     </div>
                                 </div>
-                            ))}
-                        </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
             </div>
@@ -480,7 +476,7 @@ const JoinCall = () => {
             {joined ? (
                 <div className="flex flex-col h-screen bg-gray-900">
                     {/* Video Area */}
-                    <div className="flex-1 p-2 overflow-hidden">
+                    <div className="flex-1 p-2 overflow-y-scroll">
                         {renderVideoLayout()}
                     </div>
 
