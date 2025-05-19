@@ -73,7 +73,7 @@ const JoinCall = () => {
                     ...prev,
                     [user.uid]: true
                 }));
-                
+
                 // Play video after a small delay to ensure container exists
                 setTimeout(() => {
                     const container = document.getElementById(`remote-video-${user.uid}`);
@@ -130,7 +130,7 @@ const JoinCall = () => {
 
             // Remove from video tracks state
             setUserVideoTracks(prev => {
-                const newState = {...prev};
+                const newState = { ...prev };
                 delete newState[user.uid];
                 return newState;
             });
@@ -169,11 +169,23 @@ const JoinCall = () => {
         };
     }, []);
 
+    // const fetchToken = async () => {
+    //     const { data } = await axios.post("http://localhost:5000/api/auth/token", {
+    //         channelName: channel,
+    //     });
+    //     return data.token;
+    // };
+
     const fetchToken = async () => {
-        const { data } = await axios.post("http://localhost:5000/api/auth/token", {
-            channelName: channel,
-        });
-        return data.token;
+        try {
+            const { data } = await axios.post("/api/auth/token", {
+                channelName: channel,
+            });
+            return data.token;
+        } catch (error) {
+            console.error("Error fetching token:", error);
+            throw new Error("Failed to get access token. Please try again.");
+        }
     };
 
     const joinCall = async (e) => {
@@ -303,14 +315,14 @@ const JoinCall = () => {
             const muted = !isCamMuted;
             await camTrackRef.current.setMuted(muted);
             setIsCamMuted(muted);
-            
+
             // Update local video track status
             if (localUserId) {
                 setUserVideoTracks(prev => ({
                     ...prev,
                     [localUserId]: !muted
                 }));
-                
+
                 // If camera is muted, show avatar instead
                 if (muted && localVideoRef.current) {
                     localVideoRef.current.innerHTML = `
@@ -348,7 +360,7 @@ const JoinCall = () => {
 
                 // Store the screen track reference
                 screenTrackRef.current = Array.isArray(screenTrack) ? screenTrack[0] : screenTrack;
-                
+
                 // Unpublish camera track before publishing screen
                 if (camTrackRef.current) {
                     await client.unpublish(camTrackRef.current);
@@ -428,7 +440,7 @@ const JoinCall = () => {
                 <div className="flex-1 flex items-center justify-center p-4">
                     <div className="w-full h-full bg-gray-900 rounded-lg flex items-center justify-center text-white shadow-lg relative overflow-hidden">
                         {/* Local user video */}
-                        <div 
+                        <div
                             ref={localVideoRef}
                             className={`w-[250px] h-[150px] rounded-lg bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
                         >
@@ -443,8 +455,8 @@ const JoinCall = () => {
                                     className={`w-full h-[150px] bg-gray-800 flex items-center justify-center text-white cursor-pointer transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
                                     onClick={() => setActiveSpeakerId(user.uid)}
                                 >
-                                    <div 
-                                        id={`remote-video-${user.uid}`} 
+                                    <div
+                                        id={`remote-video-${user.uid}`}
                                         className="w-full h-full bg-black"
                                     >
                                         {!userVideoTracks[user.uid] && (
