@@ -11,7 +11,9 @@ import {
     FaUser
 } from 'react-icons/fa';
 import { Bounce, toast } from 'react-toastify';
+import { io } from 'socket.io-client';
 
+const socket = io(import.meta.env.VITE_APP_SOCKET_URL);
 const AGORA_APP_ID = import.meta.env.VITE_AGORA_APP_ID;
 
 const JoinCall = () => {
@@ -31,6 +33,27 @@ const JoinCall = () => {
     const [activeSpeakerId, setActiveSpeakerId] = useState(null);
     const [localUserId, setLocalUserId] = useState(null);
     const [userVideoTracks, setUserVideoTracks] = useState({});
+    const [screenSharerId, setScreenSharerId] = useState(null);
+
+    // Socket.io screen sharing events
+    useEffect(() => {
+        const handleStart = ({ userId }) => {
+            if (userId !== localUserId) {
+                setScreenSharerId(userId);
+            }
+        };
+        const handleStop = ({ userId }) => {
+            if (userId !== localUserId) {
+                setScreenSharerId(null);
+            }
+        };
+        socket.on('screen-share-start', handleStart);
+        socket.on('screen-share-stop', handleStop);
+        return () => {
+            socket.off('screen-share-start', handleStart);
+            socket.off('screen-share-stop', handleStop);
+        };
+    }, [localUserId]);
 
     // Debounce function to prevent flickering during active speaker changes
     const debounce = (func, delay) => {
@@ -77,7 +100,7 @@ const JoinCall = () => {
                     const container = document.getElementById(`remote-video-${user.uid}`);
                     if (container) {
                         container.innerHTML = '';
-                        user.videoTrack.play(`remote-video-${user.uid}`);
+                        user.videoTrack.play(container);
                     } else {
                         console.warn(`Container for remote-video-${user.uid} not found`);
                     }
@@ -136,6 +159,7 @@ const JoinCall = () => {
             // Reset active speaker if they left
             if (activeSpeakerId === user.uid) {
                 setActiveSpeakerId(null);
+                setScreenSharerId(null)
             }
         });
 
@@ -287,6 +311,7 @@ const JoinCall = () => {
             }
 
             await client.leave();
+            socket.emit('screen-share-stop', { userId: localUserId, channel });
             setJoined(false);
             setActiveSpeakerId(null);
             setRemoteUsers([]);
@@ -295,10 +320,27 @@ const JoinCall = () => {
             setIsCamMuted(false);
             setIsMicMuted(false);
             setIsScreenSharing(false);
+            setScreenSharerId(null);
             if (localVideoRef.current) localVideoRef.current.innerHTML = '';
         } catch (err) {
             console.error('Error while leaving call:', err);
         }
+    };
+
+    const replayAllRemoteVideos = () => {
+        setTimeout(() => {
+            console.log("Replaying all remote videos");
+            // Force re-play all remote video tracks
+            Object.entries(remoteStreamsRef.current).forEach(([uid, user]) => {
+                if (user.videoTrack && userVideoTracks[uid]) {
+                    const container = document.getElementById(`remote-video-${uid}`);
+                    if (container) {
+                        container.innerHTML = '';
+                        user.videoTrack.play(`remote-video-${uid}`);
+                    }
+                }
+            });
+        }, 500);
     };
 
     const toggleMic = async () => {
@@ -371,8 +413,12 @@ const JoinCall = () => {
                 // Display screen in local video element
                 if (localVideoRef.current) {
                     localVideoRef.current.innerHTML = '';
-                    screenTrackRef.current.play(localVideoRef.current);
+                    setTimeout(() => {
+                        screenTrackRef.current.play(localVideoRef.current);
+                    }, 1000)
                 }
+
+                socket.emit('screen-share-start', { userId: localUserId, channel });
 
                 setIsScreenSharing(true);
 
@@ -416,6 +462,11 @@ const JoinCall = () => {
             }
 
             setIsScreenSharing(false);
+            socket.emit('screen-share-stop', { userId: localUserId, channel });
+
+            // After stopping screen share, we need to ensure all videos are visible
+            // by forcing a replay of all remote videos
+            replayAllRemoteVideos();
         } catch (err) {
             console.error("Error stopping screen share:", err);
         }
@@ -431,57 +482,119 @@ const JoinCall = () => {
 
 
     // Google Meet style layout with main user and side thumbnails
-    const renderVideoLayout = () => {
-        // Determine which user should be featured in the main display area
-        const mainUserId = activeSpeakerId || (remoteUsers.length > 0 ? remoteUsers[0].uid : localUserId);
-        const isLocalUserMainDisplay = mainUserId === localUserId;
+    // const renderVideoLayout = () => {
+    //     const gridCols = isScreenSharing || screenSharerId ? 1 : remoteUsers.length + 1
+    //     // Determine which user should be featured in the main display area
+    //     const mainUserId = activeSpeakerId || (remoteUsers.length > 0 ? remoteUsers[0].uid : localUserId);
+    //     const isLocalUserMainDisplay = mainUserId === localUserId;
 
-        // Create a list of users to display as thumbnails (everyone except main user)
-        const thumbnailUsers = [
-            ...remoteUsers.filter(user => user.uid !== mainUserId),
-            ...(isLocalUserMainDisplay ? [] : [{ uid: localUserId, isLocal: true }])
-        ];
+    //     // Create a list of users to display as thumbnails (everyone except main user)
+    //     const thumbnailUsers = [
+    //         ...remoteUsers.filter(user => user.uid !== mainUserId),
+    //         ...(isLocalUserMainDisplay ? [] : [{ uid: localUserId, isLocal: true }])
+    //     ];
+
+    //     return (
+    //         <div className="flex flex-col w-full h-full">
+    //             {/* Main Video Area - Shows the active speaker or selected user */}
+    //             <div className="flex-1 flex items-center justify-center">
+    //                 <div className={`grid ${getGridCols(gridCols)} w-full h-full bg-gray-900 flex gap-4 items-center justify-center text-white shadow-lg relative overflow-hidden`}>
+    //                     {/* Local user video */}
+    //                     <div
+    //                         ref={localVideoRef}
+    //                         className={`w-full h-full bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
+    //                     >
+    //                         {/* If camera is off, this will be filled with the avatar */}
+    //                     </div>
+
+    //                     {/* Remote users video thumbnails */}
+    //                     {remoteUsers.map((user) => (
+    //                         <div key={user.uid} className="flex flex-col justify-start gap-2 w-full h-full">
+    //                             <div
+    //                                 className={`w-full h-full bg-gray-800 flex items-center justify-center text-white transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
+    //                             // onClick={() => setActiveSpeakerId(user.uid)}
+    //                             >
+    //                                 <div
+    //                                     id={`remote-video-${user.uid}`}
+    //                                     className="w-full h-full bg-black"
+    //                                 >
+    //                                     {!userVideoTracks[user.uid] && (
+    //                                         <div className="flex items-center justify-center w-full h-full bg-gray-700">
+    //                                             <div className="p-4 rounded-full bg-gray-500 flex items-center justify-center">
+    //                                                 <FaUser className="text-white text-2xl" />
+    //                                             </div>
+    //                                         </div>
+    //                                     )}
+    //                                 </div>
+    //                             </div>
+    //                         </div>
+    //                     ))}
+    //                 </div>
+    //             </div>
+    //         </div>
+    //     );
+    // };
+
+    useEffect(() => {
+        // When screen sharing stops, make sure all videos are displayed properly
+        if (!isScreenSharing && !screenSharerId) {
+            replayAllRemoteVideos();
+        }
+    }, [isScreenSharing, screenSharerId]);
+
+    const renderVideoLayout = () => {
+        // Show only the screen sharer's video in full screen if screen sharing is active
+        const sharerId = isScreenSharing ? localUserId : screenSharerId;
+        const isLocalSharer = sharerId === localUserId;
+
+        // Otherwise show all participants in grid
+        const gridCols = isScreenSharing || screenSharerId ? 1 : remoteUsers.length + 1;
 
         return (
             <div className="flex flex-col w-full h-full">
-                {/* Main Video Area - Shows the active speaker or selected user */}
                 <div className="flex-1 flex items-center justify-center">
-                    <div className={`grid ${getGridCols(remoteUsers.length + 1)} w-full h-full bg-gray-900 flex gap-4 items-center justify-center text-white shadow-lg relative overflow-hidden`}>
-                        {/* Local user video */}
-                        <div
-                            ref={localVideoRef}
-                            className={`w-full h-full bg-black ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
-                        >
-                            {/* If camera is off, this will be filled with the avatar */}
-                        </div>
-
-                        {/* Remote users video thumbnails */}
-                        {remoteUsers.map((user) => (
-                            <div key={user.uid} className="flex flex-col justify-start gap-2 w-full h-full">
-                                <div
-                                    className={`w-full h-full bg-gray-800 flex items-center justify-center text-white transition-all duration-200 overflow-hidden ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
-                                // onClick={() => setActiveSpeakerId(user.uid)}
-                                >
+                    <div className={`grid ${getGridCols(gridCols)} w-full h-full bg-gray-900 gap-4`}>
+                        {
+                            <div
+                                ref={localVideoRef}
+                                className={`${screenSharerId ? "w-0 h-0 bg-inherit hidden" : "w-full h-full bg-black"} ${activeSpeakerId === localUserId ? 'border-2 border-red-500' : ''}`}
+                            />
+                        }
+                        {screenSharerId ? (
+                            <div className="flex-1 w-full h-full flex items-center justify-center bg-black relative">
+                                <div className="w-[70%] h-full">
                                     <div
-                                        id={`remote-video-${user.uid}`}
-                                        className="w-full h-full bg-black"
-                                    >
-                                        {!userVideoTracks[user.uid] && (
-                                            <div className="flex items-center justify-center w-full h-full bg-gray-700">
-                                                <div className="p-4 rounded-full bg-gray-500 flex items-center justify-center">
-                                                    <FaUser className="text-white text-2xl" />
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
+                                        ref={isLocalSharer ? localVideoRef : null}
+                                        id={!isLocalSharer ? `remote-video-${sharerId}` : undefined}
+                                        className="w-full h-full"
+                                    />
                                 </div>
                             </div>
-                        ))}
+                        ) :
+                            remoteUsers.map((user) => {
+                                return (
+                                    <div key={user.uid} className={`${isScreenSharing ? "w-0 h-0 bg-inherit hidden" : "w-full h-full"}`}>
+                                        <div
+                                            id={`remote-video-${user.uid}`}
+                                            className={`w-full h-full bg-black ${activeSpeakerId === user.uid ? 'border-2 border-red-500' : ''}`}
+                                        >
+                                            {!userVideoTracks[user.uid] && (
+                                                <div className="flex items-center justify-center w-full h-full bg-gray-700">
+                                                    <div className="p-4 rounded-full bg-gray-500 flex items-center justify-center">
+                                                        <FaUser className="text-white text-2xl" />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )
+                            })}
                     </div>
                 </div>
             </div>
         );
     };
+
 
     return (
         <>
